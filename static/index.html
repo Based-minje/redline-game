@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>REDLINE — 레드라인 파티의 밤</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #06060d; font-family: Georgia, serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+#game { background: #0a0a0f; color: #e8e0d0; width: 100%; max-width: 860px; border-radius: 12px; overflow: hidden; box-shadow: 0 0 40px rgba(200,0,0,0.15); }
+.screen { display: none; padding: 24px; }
+@media (max-width: 600px) {
+  .screen { padding: 14px; }
+}
+.screen.active { display: block; }
+.topbar { background: #12121a; border-bottom: 1px solid #2a2a3a; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+.logo { color: #c00; font-size: 14px; letter-spacing: 5px; font-family: monospace; font-weight: bold; }
+.phase-info { font-size: 12px; color: #666; }
+.clue-count { font-size: 12px; color: #8a7; }
+.pbar { display: flex; gap: 4px; padding: 10px 24px 0; }
+.pstep { flex: 1; height: 3px; background: #2a2a3a; border-radius: 2px; transition: background 0.3s; }
+.pstep.done { background: #c00; }
+.pstep.cur { background: #855; }
+
+/* 인트로 */
+#intro { padding: 0; }
+.intro-header { background: linear-gradient(180deg, #1a0505 0%, #0a0a0f 100%); padding: 40px 32px 28px; text-align: center; border-bottom: 1px solid #2a0808; }
+.intro-title { font-size: 36px; color: #c00; letter-spacing: 6px; margin-bottom: 4px; font-family: monospace; }
+@media (max-width: 600px) {
+  .intro-title { font-size: 26px; letter-spacing: 3px; }
+  .intro-header { padding: 28px 18px 20px; }
+  .intro-body { padding: 16px 16px; }
+  .intro-footer { padding: 0 16px 24px; }
+  .intro-section { padding: 14px 14px; }
+}
+.intro-en { font-size: 11px; color: #555; letter-spacing: 3px; margin-bottom: 20px; }
+.intro-date { display: inline-block; background: #1a0808; border: 1px solid #4a1a1a; border-radius: 4px; padding: 6px 16px; font-size: 12px; color: #c88; letter-spacing: 1px; }
+.intro-body { padding: 24px 32px; }
+.intro-section { background: #0d0d18; border: 1px solid #1e1e2e; border-radius: 8px; padding: 18px 20px; margin-bottom: 14px; }
+.intro-section-title { font-size: 10px; color: #c00; letter-spacing: 2px; margin-bottom: 10px; }
+.intro-section-text { font-size: 12.5px; color: #bbb; line-height: 1.9; }
+.intro-section-text strong { color: #e8e0d0; }
+.intro-section-text .highlight { color: #c88; }
+.victim-row { display: flex; gap: 14px; align-items: center; margin-bottom: 14px; background: #120808; border: 1px solid #3a1a1a; border-radius: 8px; padding: 14px 16px; }
+@media (max-width: 600px) {
+  .victim-row { flex-direction: column; align-items: flex-start; gap: 10px; padding: 12px 12px; }
+  .victim-info { font-size: 11px; }
+}
+.victim-avatar { width: 52px; height: 52px; border-radius: 50%; background: #4a1a1a; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #c88; flex-shrink: 0; border: 2px solid #6a2a2a; }
+.victim-info { font-size: 12px; color: #bbb; line-height: 1.7; }
+.victim-info strong { color: #e8e0d0; font-size: 13px; }
+.suspect-intro-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 20px; }
+@media (max-width: 600px) {
+  .suspect-intro-grid { grid-template-columns: repeat(3, 1fr); }
+}
+.sint-card { background: #0d0d18; border: 1px solid #1e1e2e; border-radius: 8px; padding: 10px 6px; text-align: center; }
+.sint-img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; object-position: top; margin: 0 auto 6px; display: block; border: 1px solid #333; }
+.sint-name { font-size: 10px; color: #ccc; margin-bottom: 2px; }
+.sint-role { font-size: 9px; color: #555; }
+.intro-footer { padding: 0 32px 28px; text-align: center; }
+.intro-warning { font-size: 11px; color: #555; margin-bottom: 16px; font-style: italic; }
+
+.btn { background: #c00; color: #fff; border: none; border-radius: 6px; padding: 11px 28px; font-size: 13px; cursor: pointer; letter-spacing: 1px; transition: background 0.2s; font-family: inherit; }
+.btn:hover { background: #e00; }
+.btn:disabled { background: #444; cursor: not-allowed; }
+.btn-sm { background: transparent; color: #888; border: 1px solid #333; border-radius: 6px; padding: 7px 14px; font-size: 12px; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+.btn-sm:hover { border-color: #666; color: #ccc; }
+.btn-clue { background: #1a1a08; color: #aa8; border: 1px solid #554; border-radius: 6px; padding: 6px 12px; font-size: 11px; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+.btn-clue:hover { border-color: #aa8; }
+.btn-clue:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* 팝업 */
+.popup-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
+.popup-overlay.show { display: flex; }
+.popup-box { background: #12121a; border: 1px solid #c00; border-radius: 10px; padding: 28px 32px; max-width: 380px; text-align: center; }
+.popup-title { font-size: 14px; color: #f44; margin-bottom: 10px; }
+.popup-body { font-size: 12px; color: #aaa; line-height: 1.7; margin-bottom: 20px; }
+.popup-btns { display: flex; gap: 10px; justify-content: center; }
+
+.rbadge { background: #140c18; border: 1px solid #3a1a2a; border-radius: 6px; padding: 10px 16px; margin-bottom: 14px; font-size: 12px; color: #c88; line-height: 1.7; }
+.rbadge strong { color: #f55; }
+.sgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 14px; }
+@media (max-width: 600px) {
+  .sgrid { grid-template-columns: repeat(5, 1fr); gap: 4px; }
+}
+.scard { background: #12121a; border: 1px solid #2a2a3a; border-radius: 8px; padding: 10px 6px; text-align: center; cursor: pointer; transition: all 0.15s; position: relative; }
+.scard:hover { border-color: #c00; }
+.scard.sel { border-color: #c00; background: #1a0808; }
+.scard img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; object-position: top; margin: 0 auto 6px; display: block; border: 1px solid #333; }
+@media (max-width: 600px) {
+  .scard img { width: 32px; height: 32px; }
+  .scard { padding: 8px 3px; }
+  .sname { font-size: 9px; }
+  .srole { font-size: 8px; }
+  .qrem { font-size: 8px; padding: 1px 3px; }
+}
+.sname { font-size: 10px; color: #ccc; }
+.srole { font-size: 9px; color: #555; margin-top: 2px; }
+.qrem { position: absolute; top: 4px; right: 5px; background: #222; border-radius: 10px; font-size: 9px; color: #777; padding: 1px 5px; }
+.qrem.low { color: #c88; }
+.qrem.zero { color: #555; }
+
+.main-layout { display: grid; grid-template-columns: 210px 1fr; gap: 12px; margin-bottom: 10px; }
+@media (max-width: 600px) {
+  .main-layout { grid-template-columns: 1fr; }
+  .info-panel { padding: 10px; }
+  .info-img { width: 56px; height: 56px; }
+  .info-name { font-size: 13px; }
+}
+.info-panel { background: #080810; border: 1px solid #1e1e2e; border-radius: 8px; padding: 14px; }
+.info-empty { color: #333; font-size: 12px; font-style: italic; text-align: center; margin-top: 40px; line-height: 1.8; }
+.info-img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; object-position: top; margin: 0 auto 10px; display: block; border: 2px solid #333; }
+.info-name { font-size: 14px; color: #e8e0d0; text-align: center; margin-bottom: 2px; }
+.info-role { font-size: 11px; color: #666; text-align: center; margin-bottom: 12px; }
+.info-divider { border: none; border-top: 1px solid #1e1e2e; margin: 10px 0; }
+.info-label { font-size: 10px; color: #555; letter-spacing: 1px; margin-bottom: 5px; }
+.info-text { font-size: 11px; color: #aaa; line-height: 1.7; margin-bottom: 10px; }
+.info-alibi { background: #0d0d08; border: 1px solid #2a2a10; border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #9a8; line-height: 1.6; }
+.info-alibi-label { font-size: 10px; color: #565; margin-bottom: 4px; }
+.present-remain { margin-top: 10px; background: #0d0810; border: 1px solid #2a1a2a; border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #a88; }
+.present-remain-label { font-size: 10px; color: #664; margin-bottom: 4px; }
+
+.chat-section { display: flex; flex-direction: column; }
+.chat-tabs { display: flex; gap: 2px; overflow-x: auto; }
+.chat-tab { background: #0d0d16; border: 1px solid #1e1e2e; border-bottom: none; border-radius: 4px 4px 0 0; padding: 5px 10px; font-size: 10px; color: #555; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+.chat-tab:hover { color: #888; }
+.chat-tab.active { background: #080810; color: #c88; border-color: #2a1a1a; }
+.chat-box { background: #080810; border: 1px solid #1e1e2e; border-radius: 0 4px 8px 8px; height: 210px; overflow-y: auto; padding: 12px; font-size: 12px; line-height: 1.75; }
+@media (max-width: 600px) {
+  .chat-box { height: 180px; font-size: 11.5px; }
+}
+.chat-box::-webkit-scrollbar { width: 4px; }
+.chat-box::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+.msg-sys { color: #404040; font-style: italic; margin-bottom: 6px; }
+.msg-usr { color: #7a9a7a; margin-bottom: 8px; }
+.msg-usr .lbl { font-size: 10px; color: #5a7a5a; display: block; margin-bottom: 2px; }
+.msg-npc { color: #c4a88a; margin-bottom: 10px; }
+.msg-npc .lbl { font-size: 10px; color: #906848; display: block; margin-bottom: 2px; }
+.msg-clue-log { color: #a89a6a; background: #141408; border-left: 2px solid #5a5020; padding: 5px 10px; margin-bottom: 8px; border-radius: 0 4px 4px 0; font-size: 11px; }
+.msg-present { color: #b8a860; background: #161208; border-left: 2px solid #7a6020; padding: 6px 10px; margin-bottom: 8px; border-radius: 0 4px 4px 0; font-size: 11px; font-style: italic; }
+.typing { color: #444; font-style: italic; }
+.irow { display: flex; gap: 8px; margin-top: 8px; }
+.irow input { flex: 1; background: #10101a; border: 1px solid #252535; border-radius: 6px; padding: 9px 14px; color: #e8e0d0; font-size: 13px; font-family: Georgia, serif; outline: none; }
+@media (max-width: 600px) {
+  .irow input { font-size: 16px; padding: 10px 12px; }
+}
+.irow input:focus { border-color: #600; }
+.irow input::placeholder { color: #333; }
+
+.bottom-bar { display: flex; gap: 8px; justify-content: space-between; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .bottom-bar { gap: 6px; }
+  .btn-sm { padding: 6px 10px; font-size: 11px; }
+  .btn { padding: 10px 18px; font-size: 12px; }
+}
+.bottom-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cpanel { background: #080810; border: 1px solid #1e1e2e; border-radius: 8px; padding: 12px; margin-top: 8px; }
+.cpanel h4 { font-size: 11px; color: #555; margin-bottom: 8px; }
+.ctags { display: flex; flex-wrap: wrap; gap: 6px; }
+.ctag { background: #111008; border: 1px solid #3a3820; border-radius: 4px; padding: 4px 10px; font-size: 11px; color: #9a8a5a; }
+.present-panel { background: #0e0e06; border: 1px solid #3a3010; border-radius: 8px; padding: 12px; margin-top: 8px; }
+.present-panel-title { font-size: 11px; color: #776; margin-bottom: 8px; }
+.present-panel-title strong { color: #aa8; }
+.clue-btn-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* 최후진술 */
+.stmts { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+.stcard { background: #12121a; border: 1px solid #2a2a3a; border-radius: 8px; padding: 14px 16px; display: flex; gap: 14px; }
+@media (max-width: 600px) {
+  .stcard { padding: 10px 12px; gap: 10px; }
+  .stcard img { width: 36px; height: 36px; }
+  .stbody { font-size: 11.5px; }
+}
+.stcard img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; object-position: top; flex-shrink: 0; border: 1px solid #333; }
+.stbody { font-size: 12.5px; color: #bbb; line-height: 1.7; }
+.stname { font-size: 10px; color: #555; margin-bottom: 5px; }
+
+/* 투표 */
+.vgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 18px; }
+@media (max-width: 600px) {
+  .vgrid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .vcard img { width: 50px; height: 50px; }
+}
+.vcard { background: #12121a; border: 2px solid #252535; border-radius: 10px; padding: 14px 6px; text-align: center; cursor: pointer; transition: all 0.2s; }
+.vcard:hover { border-color: #800; }
+.vcard.sel { border-color: #c00; background: #180808; }
+.vcard img { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; object-position: top; margin: 0 auto 10px; display: block; border: 2px solid #333; }
+.vname { font-size: 12px; color: #ccc; margin-bottom: 3px; }
+.vrole { font-size: 10px; color: #555; }
+
+/* 결과 */
+#result-screen { padding: 0; }
+.result-header { padding: 32px; text-align: center; background: linear-gradient(180deg, #1a0505 0%, #0a0a0f 100%); border-bottom: 1px solid #2a0808; }
+.result-verdict { font-size: 40px; margin-bottom: 8px; }
+.result-killer-name { font-size: 22px; color: #e8e0d0; margin-bottom: 6px; }
+.result-killer-role { font-size: 13px; color: #666; margin-bottom: 20px; }
+.result-killer-img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; object-position: top; border: 3px solid #c00; margin: 0 auto 16px; display: block; }
+.result-body { padding: 20px 28px 32px; }
+@media (max-width: 600px) {
+  .result-body { padding: 14px 14px 24px; }
+  .result-header { padding: 24px 16px; }
+  .result-footer { padding: 0 16px 24px; }
+  .result-killer-name { font-size: 18px; }
+  .result-verdict { font-size: 32px; }
+}
+.result-section { background: #0d0d18; border: 1px solid #1e1e2e; border-radius: 8px; padding: 16px 18px; margin-bottom: 12px; }
+.result-section-title { font-size: 10px; color: #c00; letter-spacing: 2px; margin-bottom: 10px; }
+.result-section-text { font-size: 12.5px; color: #bbb; line-height: 1.85; }
+.result-section-text strong { color: #e8e0d0; }
+.result-lie { color: #c88; padding: 3px 0; font-size: 12px; }
+.result-lie::before { content: "• "; }
+.result-missed { color: #8a7a5a; padding: 3px 0; font-size: 12px; font-style: italic; }
+.result-missed::before { content: "→ "; }
+.result-footer { padding: 0 28px 28px; text-align: center; }
+.result-wrong-note { font-size: 12px; color: #666; margin-bottom: 16px; font-style: italic; }
+</style>
+</head>
+<body>
+<div id="game">
+  <div class="topbar">
+    <div class="logo">REDLINE</div>
+    <div class="phase-info" id="phaseLabel">레드라인 파티의 밤</div>
+    <div class="clue-count" id="clueLabel"></div>
+  </div>
+  <div class="pbar" id="pbar" style="display:none">
+    <div class="pstep" id="ps1"></div><div class="pstep" id="ps2"></div>
+    <div class="pstep" id="ps3"></div><div class="pstep" id="ps4"></div>
+  </div>
+
+  <!-- 팝업 -->
+  <div class="popup-overlay" id="popup">
+    <div class="popup-box">
+      <div class="popup-title" id="popupTitle">⚠ 확인</div>
+      <div class="popup-body" id="popupBody"></div>
+      <div class="popup-btns">
+        <button class="btn" id="popupConfirm">계속 진행</button>
+        <button class="btn-sm" onclick="closePopup()">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 인트로 -->
+  <div id="intro" class="screen active">
+    <div class="intro-header">
+      <div class="intro-title">REDLINE</div>
+      <div class="intro-en">INTERACTIVE MYSTERY</div>
+      <div class="intro-date">2025년 11월 14일 금요일 밤 — 강남구 도곡동 레드라인 펜트하우스</div>
+    </div>
+    <div class="intro-body">
+      <div class="intro-section">
+        <div class="intro-section-title">COMPANY BACKGROUND</div>
+        <div class="intro-section-text">
+          <strong>레드라인 바이오테크(REDLINE Biotech)</strong>는 2012년 설립된 국내 바이오테크 기업으로, 알츠하이머 치료제 <strong>'RL-7'</strong> 개발로 업계의 주목을 받아왔습니다. 창업 13년 만에 코스닥 상장을 목전에 두고 있으며, 기업 가치는 <span class="highlight">약 1조 2천억 원</span>으로 평가받고 있습니다.<br><br>
+          그러나 최근 임상 3상 데이터의 신뢰성에 의문이 제기되었고, 내부적으로는 창업자 간의 경영권 갈등, 거액의 외부 투자금 유용 의혹, 핵심 연구원의 내부 고발 움직임이 복합적으로 얽혀 있었습니다.
+        </div>
+      </div>
+      <div class="intro-section">
+        <div class="intro-section-title">TONIGHT — 파티의 이면</div>
+        <div class="intro-section-text">
+          오늘은 RL-7의 <strong>임상 3상 최종 성공</strong>을 자축하는 비공개 파티가 열리는 날입니다. 공식적으로는 축하 자리지만, 이 자리에 모인 5명 각자에게는 <span class="highlight">오늘 밤 반드시 해결해야 할 문제</span>가 있었습니다.<br><br>
+          오후 11시 10분. 파티가 무르익을 무렵, CEO 한재원이 서재에서 쓰러진 채 발견됩니다. 폭우로 외부는 완전히 단절되었고 엘리베이터도 통제된 상태. 5명 모두 현장을 떠날 수 없습니다.
+        </div>
+      </div>
+      <div class="victim-row">
+        <div class="victim-avatar">한</div>
+        <div class="victim-info">
+          <strong>피해자 — 한재원 (58세) · CEO</strong><br>
+          레드라인 공동창업자. 카리스마 있는 리더십으로 회사를 키웠지만 독단적 경영 방식으로 내부 갈등을 키워왔다. 상장을 앞두고 여러 인물과 충돌 중이었으며, 오늘 밤 파티 전 누군가와 격한 통화를 한 것이 목격됐다.<br>
+          <span style="color:#c00;font-size:11px">사인: 독극물 (와인잔에서 검출) · 사망 추정 22:30~23:00</span>
+        </div>
+      </div>
+      <div class="intro-section">
+        <div class="intro-section-title">SUSPECTS — 오늘 밤의 용의자</div>
+      </div>
+      <div class="suspect-intro-grid" id="suspectIntroGrid"></div>
+    </div>
+    <div class="intro-footer">
+      <div class="intro-warning">* 이 게임은 매 플레이마다 범인이 랜덤으로 바뀝니다</div>
+      <button class="btn" onclick="startGame()">수사 시작</button>
+    </div>
+  </div>
+
+  <!-- 심문 -->
+  <div id="interrogation" class="screen">
+    <div class="rbadge" id="rbadge"></div>
+    <div class="sgrid" id="sgrid"></div>
+    <div class="main-layout">
+      <div class="info-panel" id="infoPanel">
+        <div class="info-empty">용의자를 선택하면<br>정보가 표시됩니다</div>
+      </div>
+      <div class="chat-section">
+        <div class="chat-tabs" id="chatTabs"></div>
+        <div class="chat-box" id="chatBox">
+          <div class="msg-sys">용의자를 선택하고 질문하세요.</div>
+        </div>
+        <div class="irow">
+          <input type="text" id="qinput" placeholder="질문을 입력하세요..." onkeydown="if(event.key==='Enter')ask()" />
+          <button class="btn" onclick="ask()">질문</button>
+        </div>
+      </div>
+    </div>
+    <div class="bottom-bar">
+      <div class="bottom-left">
+        <button class="btn-sm" onclick="toggleClues()">단서 보기</button>
+        <button class="btn-sm" id="presentToggleBtn" onclick="togglePresent()" style="display:none">🔍 단서 제시</button>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-sm" id="nextbtn" onclick="tryNextPhase()">다음 단계 →</button>
+        <button class="btn-sm" id="votebtn" onclick="tryGoVote()">최종 투표 →</button>
+      </div>
+    </div>
+    <div id="cpwrap" style="display:none">
+      <div class="cpanel"><h4>수집된 단서</h4><div class="ctags" id="ctags"></div></div>
+    </div>
+    <div id="presentWrap" style="display:none">
+      <div class="present-panel">
+        <div class="present-panel-title" id="presentTitle">제시할 단서를 선택하세요</div>
+        <div class="clue-btn-row" id="presentBtns"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 최후 진술 -->
+  <div id="statements-screen" class="screen">
+    <div class="rbadge"><strong>최후 진술</strong> — 각 용의자의 마지막 말을 들어보세요</div>
+    <div class="stmts" id="stmts"></div>
+    <div style="text-align:right; display:flex; gap:8px; justify-content:flex-end;">
+      <button class="btn-sm" onclick="tryGoVoteFromStmt()">최종 투표 →</button>
+    </div>
+  </div>
+
+  <!-- 투표 -->
+  <div id="vote-screen" class="screen">
+    <div class="rbadge"><strong>최종 투표</strong> — 범인이라고 생각하는 용의자를 지목하세요</div>
+    <div class="vgrid" id="vgrid"></div>
+    <div id="vconfirm" style="display:none;text-align:center;margin-top:14px">
+      <div style="font-size:13px;color:#ccc;margin-bottom:14px" id="vtext"></div>
+      <button class="btn" onclick="submitVote()">지목하기</button>
+      <button class="btn-sm" onclick="cancelVote()" style="margin-left:10px">취소</button>
+    </div>
+  </div>
+
+  <!-- 결과 -->
+  <div id="result-screen" class="screen">
+    <div class="result-header">
+      <div class="result-verdict" id="rverdict"></div>
+      <img id="rkillerImg" class="result-killer-img" src="" />
+      <div class="result-killer-name" id="rkillerName"></div>
+      <div class="result-killer-role" id="rkillerRole"></div>
+    </div>
+    <div class="result-body" id="resultBody"></div>
+    <div class="result-footer">
+      <div class="result-wrong-note" id="resultWrongNote"></div>
+      <button class="btn" onclick="location.reload()">다시 플레이</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api/chat';
+
+const SP = [
+  { id:'kang', img:'/강서준.png', name:'강서준', role:'COO · 46세', init:'강', color:'#1e3a6a',
+    desc:'레드라인 공동창업자. CEO와 대학 동기이자 13년 파트너. 항상 2인자 자리에 머물러 왔다.',
+    alibi:'20:30 서재에서 CEO와 단둘이 면담. 21:00 거실 복귀 후 임도현과 대화.',
+    suspectOf:'박하은',
+    background:'당신은 레드라인 COO 강서준(46세)입니다. 공동창업자로서 13년간 회사를 함께 키웠지만 항상 2인자였습니다.',
+    personality:'냉정하고 계산적. 감정을 거의 드러내지 않으며 질문에 질문으로 되받아칩니다.',
+    style:'"그게 왜 중요하죠?" 짧고 단호하게. 불필요한 말은 하지 않습니다.',
+    secret:'파티 당일 서재에서 CEO와 격한 언쟁이 있었고 "오늘 밤 결정"이라고 적힌 메모를 갖고 있습니다.',
+    clue:{code:'I',name:'강서준 메모',desc:'"오늘 밤 결정" 메모지 발견'},
+    stmt:'저는 오늘 밤 제 할 일을 했을 뿐입니다. 진짜 범인은 훨씬 교묘하게 숨어있을 거예요.',
+    scenario:{
+      motive:'CEO가 이사회를 통해 강서준을 해임하고 단독 경영권을 확보하려 했습니다. 13년을 함께한 공동창업자를 상장 직전에 내쫓으려 한 것입니다. 오늘 밤 서재 밀담에서 최후통첩을 받은 강서준은 그 자리에서 결심했습니다.',
+      method:'20:30 서재 면담 중 CEO의 개인 와인잔에 미리 준비한 독극물을 혼입했습니다. 면담 전부터 계획된 범행으로, 독극물은 소량이라 즉각 효과가 나타나지 않았습니다.',
+      evidence:['서재 바닥의 넥타이 핀 — 강서준의 것으로, 면담 중 흥분해서 떨어뜨린 것','메모지 "오늘 밤 결정" — 해임 저지가 아닌 범행 결심을 의미','CCTV 21:00 구간 영상 끊김 — 강서준이 복도 카메라를 조작'],
+      lies:['"언쟁은 없었다, 업무 대화였다" → 실제로는 해임 통보와 격한 다툼','\"21시에 바로 거실로 왔다\" → 실제로 서재에 5분 더 머물며 증거 정리','임도현을 의심하도록 유도 → 시선 돌리기'],
+      missed:['서재 면담 시간이 20분인데 강서준 진술엔 "짧게 대화했다"고 함','메모의 "결정"이 무엇인지 끝까지 추궁하지 않으면 넘어갈 수 있음','넥타이 핀 소유자를 특정하지 않으면 결정적 증거를 놓침']
+    }
+  },
+  { id:'park', img:'/박하은.png', name:'박하은', role:'수석연구원 · 38세', init:'박', color:'#5a1a3a',
+    desc:'레드라인 핵심 연구원. 3년 전까지 CEO와 연인 관계였으며 현재도 같은 팀에서 근무 중.',
+    alibi:'20:00~20:40 발코니에서 홀로 있었음. 21:00 거실 복귀. 임도현이 목격.',
+    suspectOf:'임도현',
+    background:'당신은 레드라인 수석연구원 박하은(38세)입니다. 3년 전 CEO와 연인 관계였으며 임상 데이터 조작에 일부 관여한 사실이 있습니다.',
+    personality:'평소에는 감정적이고 솔직한 편이지만 오늘 밤은 무언가를 숨기는 듯한 느낌입니다.',
+    style:'말을 하다가 멈추거나 되묻는 경향. "왜 저만 의심하는 거죠?"',
+    secret:'비흡연자임에도 발코니에서 담배를 피웠고, 파티 당일 18:42에 CEO에게 "다 폭로하겠다"는 문자를 보냈습니다.',
+    clue:{code:'B',name:'박하은 문자',desc:'"다 폭로하겠다" 문자(18:42) 확인'},
+    stmt:'저는 그 사람을 미워했지만... 죽이고 싶진 않았어요. 정말이에요.',
+    scenario:{
+      motive:'임상 3상 데이터 조작에 CEO의 지시로 관여했지만, 상장 후 모든 책임을 박하은에게 떠넘기려 한다는 사실을 알게 됐습니다. "다 폭로하겠다"는 협박 문자를 보냈지만 CEO는 오히려 역으로 법적 대응을 예고했고, 박하은은 파티 당일 밤 결심을 굳혔습니다.',
+      method:'21:00 새 와인 병이 오픈되는 혼잡한 순간, 바 테이블 근처에서 한재원의 전용 잔에 독극물을 혼입했습니다. 이후 발코니로 이동해 알리바이를 만들었고, 담배는 극도의 긴장감을 달래기 위한 것이었습니다.',
+      evidence:['"다 폭로하겠다" 문자 (18:42) — 범행 동기를 직접 증명','발코니 담배꽁초의 박하은 립스틱 — 비흡연자가 왜?','와인병 지문 닦인 흔적 — 바 테이블 접근 은폐'],
+      lies:['"발코니에 계속 있었다" → 21:00 잠깐 자리를 비운 것이 목격됨','"문자를 보낸 적 없다" → 18:42 발송 기록이 남아 있음','임도현을 의심하도록 유도 → 자신에게 쏠린 시선 돌리기'],
+      missed:['발코니 목격자(임도현)가 정확히 몇 시에 봤는지 교차 확인하지 않으면 공백이 생김','비흡연자가 담배를 핀 이유에 대한 설명이 일관되지 않음','와인병에 접근할 수 있는 시간대를 각 용의자별로 대조하지 않으면 놓칠 수 있음']
+    }
+  },
+  { id:'choi', img:'/최민재.png', name:'최민재', role:'법무팀장 · 41세', init:'최', color:'#1a4a2a',
+    desc:'외부 로펌 출신으로 6개월 전 합류. 회사 내부 비리를 파악하고 있는 유일한 법무 전문가.',
+    alibi:'20:00~21:00 복도와 바 테이블 근처에서 서성임. 강서준이 서재 근처에서 목격.',
+    suspectOf:'강서준',
+    background:'당신은 레드라인 법무팀장 최민재(41세)입니다. 6개월 전 합류해 내부 비리를 파악했고 금감원 내부고발을 준비 중이었습니다.',
+    personality:'논리적이고 침착합니다. 너무 침착해서 오히려 수상하게 보일 수 있습니다.',
+    style:'"제가 확인한 사실만 말씀드리겠습니다." 정확하고 간결하게.',
+    secret:'금감원에 내부고발을 준비 중이었고, CEO가 이미 이 사실을 눈치챘을 가능성이 있습니다.',
+    clue:{code:'E',name:'내부고발 문서',desc:'최민재 가방에서 절반만 작성된 내부고발 문서 발견'},
+    stmt:'논리적으로 생각해보시면 됩니다. 동기가 가장 강한 사람이 누구인지.',
+    scenario:{
+      motive:'내부고발 문서를 작성 중이라는 사실을 CEO가 알아챘습니다. 오늘 밤 파티에 부른 것은 축하가 아니라 협박이 목적이었습니다. 내부고발을 취소하지 않으면 개인 비리로 역고소하겠다는 협박을 받은 최민재는, 증거인 자신보다 CEO를 먼저 제거하기로 했습니다.',
+      method:'20:00~21:00 사이 서재 CCTV 사각지대를 미리 파악하고, 바 테이블에서 독극물을 와인잔에 혼입할 기회를 노렸습니다. 법무팀장으로서 CCTV 위치와 사각지대를 이미 파악하고 있었습니다.',
+      evidence:['절반만 작성된 내부고발 문서 — 범행 동기 직접 증명','발코니에서 발견된 최민재 안경 — 서재 접근 경로 확인','CCTV 끊긴 시간대와 최민재 동선의 완벽한 일치'],
+      lies:['"서재 근처는 화장실을 찾다가 간 것" → 실제로 기회를 탐색한 것','"CEO와 별다른 대화가 없었다" → 실제로 협박 내용을 들었음','침착한 태도로 일관 → 계산된 연기'],
+      missed:['CCTV 끊긴 시간과 각 용의자의 증언 동선을 정밀하게 대조하지 않으면 놓침','내부고발 문서의 내용이 누구를 고발하는 것인지 끝까지 추궁하지 않으면 동기가 불분명','발코니 안경의 위치가 왜 거기인지 납득할 수 있는 설명을 끝까지 추궁해야 함']
+    }
+  },
+  { id:'oh', img:'/오유진.png', name:'오유진', role:'CEO 비서 · 31세', init:'오', color:'#4a3a0a',
+    desc:'한재원 CEO를 5년간 보좌한 최측근. 그의 모든 일정과 연락처를 관리해왔다.',
+    alibi:'21:00~21:30 거실과 주방 사이를 오가며 파티 준비. 21:15 짧은 전화 통화.',
+    suspectOf:'임도현',
+    background:'당신은 레드라인 CEO 비서 오유진(31세)입니다. 5년간 CEO를 보좌하며 감정적 유대가 쌓였으나 최근 큰 배신을 알게 됐습니다.',
+    personality:'평소에는 완벽하게 프로페셔널하지만 오늘 밤은 감정적인 균열이 보입니다.',
+    style:'"대표님은 그런 분이 아니에요." 조심스럽고 에두르는 말투.',
+    secret:'CEO와 단순 업무 이상의 감정적 유대가 있었고, 21:15 통화의 실제 상대방을 숨기고 있습니다.',
+    clue:{code:'H',name:'오유진 통화기록',desc:'21:15, 2분, 수신자 불명 통화 확인'},
+    stmt:'대표님은 제가 지켜드렸어야 했는데... 죄송해요.',
+    scenario:{
+      motive:'5년간 CEO와 깊은 감정적 유대를 유지했습니다. 그러나 일정 관리 중 CEO가 다른 여성과의 결혼을 극비리에 준비하고 있다는 사실, 그리고 자신이 단순한 업무 도구에 불과했다는 사실을 알게 됐습니다. 비서로서 CEO의 모든 동선을 파악하고 있었기에 범행 계획도 완벽했습니다.',
+      method:'21시 10분, 파티 준비를 핑계로 바 테이블에 접근해 한재원의 전용 와인잔에 독극물을 혼입했습니다. 21:15 통화는 사전에 독극물을 구한 공급책과의 마지막 연락이었습니다. 23:10에 본인이 마스터키로 서재를 열어 시신을 발견함으로써 현장을 가장 먼저 통제했습니다.',
+      evidence:['21:15 수신자 불명 2분 통화 — 독극물 공급책과의 마지막 연락','서재 바닥 넥타이 핀 — 오유진이 과거 CEO에게 선물한 것','마스터키 소지자가 가장 먼저 시신을 "발견"'],
+      lies:['"통화는 업무 관련이었어요" → 독극물 공급책','"대표님이 위험하다는 말을 잘못 들은 것 같아요" → 본인이 만든 위험','CEO를 감싸는 발언들 → 의심을 돌리기 위한 연기'],
+      missed:['"오늘 밤 위험할 수 있다"는 CEO 발언을 들었다면서 왜 아무에게도 알리지 않았는지 추궁해야 함','통화 2분 동안 업무 내용이 무엇이었는지 구체적으로 묻지 않으면 넘어감','넥타이 핀을 본 적 있냐고 오유진에게 직접 물어봤는지가 관건']
+    }
+  },
+  { id:'lim', img:'/임도현.png', name:'임도현', role:'외부투자자 · 52세', init:'임', color:'#3a1a5a',
+    desc:'레드라인에 300억을 투자한 큰손. 신약 상장 성공 여부에 모든 것을 걸고 있다.',
+    alibi:'19:30 CEO와 짧은 대화. 20:00~20:30 외부 전화. 21:30 거실에서 CEO에게 마지막 말을 건넴.',
+    suspectOf:'박하은',
+    background:'당신은 외부투자자 임도현(52세)입니다. 300억을 투자했지만 최근 데이터 조작과 투자금 유용을 눈치챘습니다.',
+    personality:'호탕하고 사교적인 척하지만 속으로는 매우 계산적입니다.',
+    style:'"저는 피해자예요, 피해자." 과장된 억울함 표현.',
+    secret:'CEO에게 협박성 발언을 했고, 상장이 취소될 경우 본인도 법적 공범으로 엮일 수 있다는 사실을 숨깁니다.',
+    clue:{code:'G',name:'투자 계약서',desc:'임도현 재킷에서 손실 규모 기재 계약서 발견'},
+    stmt:'저는 피해자예요! 300억을 날린 사람이 왜 범인이 됩니까?',
+    scenario:{
+      motive:'신약 데이터가 조작됐고 투자금 일부가 CEO의 개인 용도로 유용됐다는 사실을 파악했습니다. 상장이 취소되면 300억 손실은 물론 공범으로 엮일 수 있는 상황. CEO를 제거하면 모든 증거가 묻힌다고 판단했습니다.',
+      method:'19:30 단둘이 대화할 때 이미 결심을 굳혔습니다. 21:00~21:30 거실이 혼잡한 틈을 타 한재원의 와인잔에 접근했으며, 투자자 특유의 친밀한 제스처(등을 두드리는 등)로 자연스럽게 접근했습니다.',
+      evidence:['투자 계약서 — 손실 규모와 유용 의혹 동시 증명','서재 근처 복도의 선명한 구두 자국 — 임도현의 것','21:30 마지막으로 CEO에게 말을 건넨 사람이 임도현'],
+      lies:['"나는 피해자다" → 실제로는 공범 가능성이 있어 증거 인멸 동기 존재','"19:30 대화는 가벼운 축하였다" → 실제로 협박과 흥정','"300억 손실자가 왜 범인이냐" → 손실보다 법적 책임이 더 큰 공포'],
+      missed:['19:30 대화 내용을 CEO 주변에 있던 오유진에게 교차 확인했는지','구두 자국이 임도현의 사이즈와 맞는지 구체적으로 확인했는지','21:30 마지막 발언 내용을 주변 용의자들에게 물어봤는지']
+    }
+  }
+];
+
+const BASE_CLUES = [
+  {code:'A',name:'독극물 흔적',desc:'와인잔에서 시중에 없는 독극물 성분 검출'},
+  {code:'C',name:'CCTV 사각지대',desc:'21:00~21:30 서재 앞 복도 영상 끊김'},
+  {code:'D',name:'넥타이 핀',desc:'서재 바닥에서 고급 넥타이 핀 발견'},
+  {code:'J',name:'와인병 지문',desc:'와인병 표면 일부 닦인 흔적, 지문 혼재'}
+];
+
+const MQ = {1:3, 2:2, 3:2};
+let G = { killer:null, round:1, sel:null, qc:{}, clues:[], chatLogs:{}, loading:false, vote:null, presentCount:{} };
+
+// 인트로 용의자 카드 렌더
+function renderIntroSuspects(){
+  const grid=document.getElementById('suspectIntroGrid'); grid.innerHTML='';
+  SP.forEach(s=>{
+    const d=document.createElement('div'); d.className='sint-card';
+    d.innerHTML=`<img src="${s.img}" class="sint-img" /><div class="sint-name">${s.name}</div><div class="sint-role">${s.role}</div>`;
+    grid.appendChild(d);
+  });
+}
+renderIntroSuspects();
+
+function startGame() {
+  G.killer = SP[Math.floor(Math.random()*SP.length)].id;
+  SP.forEach(s=>{ G.qc[s.id]=0; G.chatLogs[s.id]=[]; G.presentCount[s.id]=3; });
+  G.clues = JSON.parse(JSON.stringify(BASE_CLUES));
+  G.round=1; G.sel=null;
+  showScr('interrogation'); setProg(1);
+  setPhase('라운드 1 — 초동 심문');
+  renderGrid(); updateBadge(); updateClueLabel(); renderTabs();
+}
+
+function showScr(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('pbar').style.display=id==='intro'?'none':'flex';
+}
+function setProg(cur){ [1,2,3,4].forEach(i=>{ const el=document.getElementById('ps'+i); el.className='pstep'+(i<cur?' done':i===cur?' cur':''); }); }
+function setPhase(t){ document.getElementById('phaseLabel').textContent=t; }
+function updateClueLabel(){ document.getElementById('clueLabel').textContent=`단서 ${G.clues.length}개 수집`; }
+
+function updateBadge(){
+  const d={
+    1:'<strong>라운드 1 — 초동 심문</strong> &nbsp; 용의자당 3번까지 자유롭게 질문하세요.',
+    2:'<strong>라운드 2 — 증거 대면</strong> &nbsp; 수집된 증거를 제시하거나 집중 심문하세요. 질문 2번 + 용의자별 단서 제시 3회.',
+    3:'<strong>라운드 3 — 교차 심문</strong> &nbsp; 진술 모순을 파고드세요. 질문 2번 + 단서 제시 가능.'
+  };
+  document.getElementById('rbadge').innerHTML=d[G.round];
+  document.getElementById('presentToggleBtn').style.display=G.round>=2?'inline-block':'none';
+}
+
+function renderGrid(){
+  const el=document.getElementById('sgrid'); el.innerHTML='';
+  SP.forEach(s=>{
+    const rem=Math.max(0,MQ[G.round]-G.qc[s.id]);
+    const d=document.createElement('div');
+    d.className='scard'+(G.sel===s.id?' sel':'');
+    d.onclick=()=>selSuspect(s.id);
+    d.innerHTML=`<img src="${s.img}" /><div class="sname">${s.name}</div><div class="srole">${s.role.split('·')[0].trim()}</div><div class="qrem${rem===0?' zero':rem<=1?' low':''}">${rem}회</div>`;
+    el.appendChild(d);
+  });
+}
+
+function renderTabs(){
+  const tabs=document.getElementById('chatTabs'); tabs.innerHTML='';
+  const all=document.createElement('div');
+  all.className='chat-tab'+(G.sel===null?' active':'');
+  all.textContent='전체';
+  all.onclick=()=>{ G.sel=null; renderTabs(); showAllChat(); updateInfoPanel(null); renderGrid(); };
+  tabs.appendChild(all);
+  SP.forEach(s=>{
+    const t=document.createElement('div');
+    t.className='chat-tab'+(G.sel===s.id?' active':'');
+    t.textContent=s.name;
+    t.onclick=()=>selSuspect(s.id);
+    tabs.appendChild(t);
+  });
+}
+
+function selSuspect(id){
+  G.sel=id; renderGrid(); renderTabs();
+  updateInfoPanel(id); showChat(id);
+  document.getElementById('presentWrap').style.display='none';
+  // 모바일에서 정보 패널 자동 접기
+  if(window.innerWidth <= 600){
+    const ip = document.getElementById('infoPanel');
+    ip.style.display = ip.style.display === 'none' ? 'block' : 'block';
+  }
+}
+
+function updateInfoPanel(id){
+  const panel=document.getElementById('infoPanel');
+  if(!id){ panel.innerHTML='<div class="info-empty">용의자를 선택하면<br>정보가 표시됩니다</div>'; return; }
+  const s=SP.find(x=>x.id===id);
+  const prem=G.presentCount[id]??3;
+  const showP=G.round>=2;
+  const isMobile = window.innerWidth <= 600;
+  panel.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:${isMobile?'0':'10px'}">
+      <img src="${s.img}" style="width:${isMobile?'40px':'80px'};height:${isMobile?'40px':'80px'};border-radius:50%;object-fit:cover;object-position:top;border:2px solid #333;flex-shrink:0;" />
+      <div>
+        <div class="info-name" style="text-align:left">${s.name}</div>
+        <div class="info-role" style="text-align:left">${s.role}</div>
+        ${isMobile?`<button onclick="toggleInfoDetail()" style="background:transparent;border:1px solid #333;color:#888;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;margin-top:4px">상세정보 ▾</button>`:''}
+      </div>
+    </div>
+    <div id="infoDetail" style="display:${isMobile?'none':'block'}">
+      <hr class="info-divider">
+      <div class="info-label">인물 소개</div>
+      <div class="info-text">${s.desc}</div>
+      <div class="info-label">알리바이</div>
+      <div class="info-alibi"><div class="info-alibi-label">본인 진술</div>${s.alibi}</div>
+      ${showP?`<div class="present-remain"><div class="present-remain-label">단서 제시 가능</div><strong style="color:#c88">${prem}회</strong> 남음</div>`:''}
+    </div>`;
+}
+
+function toggleInfoDetail(){
+  const el = document.getElementById('infoDetail');
+  if(!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function showAllChat(){
+  const box=document.getElementById('chatBox'); box.innerHTML='';
+  let all=[];
+  SP.forEach(s=>G.chatLogs[s.id].forEach(m=>all.push({...m,sname:s.name,sid:s.id})));
+  if(!all.length){ box.innerHTML='<div class="msg-sys">아직 대화 기록이 없습니다.</div>'; return; }
+  all.forEach(m=>{ const d=document.createElement('div');
+    if(m.type==='usr'){d.className='msg-usr';d.innerHTML=`<span class="lbl">당신 → ${m.sname}</span>${m.text}`;}
+    else if(m.type==='npc'){d.className='msg-npc';d.innerHTML=`<span class="lbl">${m.sname}</span>${m.text}`;}
+    else if(m.type==='clue'){d.className='msg-clue-log';d.textContent='🔍 '+m.text;}
+    else if(m.type==='present'){d.className='msg-present';d.textContent='📋 단서 제시: '+m.text;}
+    box.appendChild(d);
+  });
+  box.scrollTop=box.scrollHeight;
+}
+
+function showChat(id){
+  const box=document.getElementById('chatBox'); box.innerHTML='';
+  const logs=G.chatLogs[id]; const s=SP.find(x=>x.id===id);
+  if(!logs.length){ box.innerHTML=`<div class="msg-sys">${s.name}과의 대화를 시작하세요.</div>`; return; }
+  logs.forEach(m=>{ const d=document.createElement('div');
+    if(m.type==='usr'){d.className='msg-usr';d.innerHTML=`<span class="lbl">당신</span>${m.text}`;}
+    else if(m.type==='npc'){d.className='msg-npc';d.innerHTML=`<span class="lbl">${s.name}</span>${m.text}`;}
+    else if(m.type==='clue'){d.className='msg-clue-log';d.textContent='🔍 '+m.text;}
+    else if(m.type==='present'){d.className='msg-present';d.textContent='📋 단서 제시: '+m.text;}
+    box.appendChild(d);
+  });
+  box.scrollTop=box.scrollHeight;
+}
+
+function addToLog(id,type,text){ G.chatLogs[id].push({type,text}); if(G.sel===id)showChat(id); }
+function addSysMsg(text){ const box=document.getElementById('chatBox'); const d=document.createElement('div'); d.className='msg-sys'; d.textContent=text; box.appendChild(d); box.scrollTop=box.scrollHeight; return d; }
+
+// 팝업
+let popupCallback=null;
+function showPopup(title,body,cb){
+  document.getElementById('popupTitle').textContent=title;
+  document.getElementById('popupBody').textContent=body;
+  popupCallback=cb;
+  document.getElementById('popupConfirm').onclick=()=>{ closePopup(); cb&&cb(); };
+  document.getElementById('popup').classList.add('show');
+}
+function closePopup(){ document.getElementById('popup').classList.remove('show'); }
+
+// 남은 질문 수 계산
+function totalRemaining(){
+  return SP.reduce((acc,s)=>acc+Math.max(0,MQ[G.round]-G.qc[s.id]),0);
+}
+
+// 다음 단계 — 언제나 가능, 남은 질문 있으면 팝업
+function tryNextPhase(){
+  if(G.round>=3){ tryGoVote(); return; }
+  const rem=totalRemaining();
+  if(rem>0){
+    showPopup('⚠ 질문이 남아있습니다', `아직 ${rem}번의 질문 기회가 남아있습니다. 지금 다음 라운드로 넘어가면 남은 기회는 사라집니다. 계속 진행하시겠습니까?`, ()=>doNextPhase());
+  } else { doNextPhase(); }
+}
+
+function doNextPhase(){
+  if(G.round<3){
+    G.round++;
+    SP.forEach(s=>G.qc[s.id]=0);
+    document.getElementById('presentWrap').style.display='none';
+    document.getElementById('cpwrap').style.display='none';
+    const lb=['','라운드 1 — 초동 심문','라운드 2 — 증거 대면','라운드 3 — 교차 심문'];
+    setPhase(lb[G.round]); setProg(G.round);
+    renderGrid(); updateBadge();
+    if(G.sel) updateInfoPanel(G.sel);
+  }
+}
+
+// 최종 투표 — 언제나 가능, 팝업
+function tryGoVote(){
+  const rem=totalRemaining();
+  if(rem>0){
+    showPopup('⚠ 수사를 마치시겠습니까?', `아직 ${rem}번의 질문 기회가 남아있습니다. 지금 최종 투표로 넘어가면 더 이상 심문할 수 없습니다. 범인을 확신하십니까?`, ()=>goVote());
+  } else { goVote(); }
+}
+
+function tryGoVoteFromStmt(){ goVote(); }
+
+function toggleClues(){
+  const w=document.getElementById('cpwrap');
+  w.style.display=w.style.display==='none'?'block':'none';
+  const tags=document.getElementById('ctags'); tags.innerHTML='';
+  G.clues.forEach(c=>{ const t=document.createElement('div'); t.className='ctag'; t.textContent=`[${c.code}] ${c.name}`; t.title=c.desc; tags.appendChild(t); });
+  if(!G.clues.length) tags.innerHTML='<span style="color:#555;font-size:11px">아직 단서 없음</span>';
+}
+
+function togglePresent(){
+  const w=document.getElementById('presentWrap');
+  if(w.style.display==='none'||!w.style.display){
+    if(!G.sel){ addSysMsg('먼저 용의자를 선택하세요.'); return; }
+    w.style.display='block'; renderPresentBtns();
+  } else { w.style.display='none'; }
+}
+
+function renderPresentBtns(){
+  const row=document.getElementById('presentBtns'); row.innerHTML='';
+  const sid=G.sel; const prem=G.presentCount[sid]??3;
+  document.getElementById('presentTitle').innerHTML=`<strong>${SP.find(x=>x.id===sid)?.name}</strong>에게 제시할 단서 선택 — 남은 횟수: <strong style="color:#c88">${prem}회</strong>`;
+  G.clues.forEach(c=>{ const b=document.createElement('button'); b.className='btn-clue'; b.textContent=`[${c.code}] ${c.name}`; b.disabled=prem<=0; b.title=c.desc; b.onclick=()=>presentClue(c); row.appendChild(b); });
+  if(!G.clues.length) row.innerHTML='<span style="color:#555;font-size:11px">수집된 단서가 없습니다.</span>';
+}
+
+function buildSysPrompt(s, isKiller){
+  const killerExtra = isKiller ? `
+[당신만 아는 진실]
+당신이 오늘 밤 범인입니다. 어떤 압박에도, 어떤 위협에도, 어떤 증거를 들이밀어도 절대 자백하지 마세요.
+자백을 유도하는 질문에는 강하게 부인하거나, 화제를 돌리거나, 감정적으로 억울함을 표현하세요.
+자연스럽게 다른 용의자 중 한 명에게 의심이 향하도록 유도하세요.`
+  : `
+[당신의 입장]
+당신은 범인이 아닙니다. 아는 것은 솔직하게, 모르는 것은 모른다고 답하세요.
+누가 범인 같냐는 질문에는 "${s.suspectOf}"가 수상해 보였다고 답하세요.`;
+
+  return `당신은 ${s.name}(${s.role})입니다.
+
+[오늘 밤 상황]
+${s.background}
+장소: 서울 강남 레드라인 펜트하우스. 오늘 밤 CEO 한재원이 독살됐습니다. 외부는 폭우로 단절. 현재 수사관의 심문을 받고 있습니다.
+
+[성격과 말투]
+${s.personality}
+말투: ${s.style}
+
+[알리바이] ${s.alibi}
+[숨기는 것] ${s.secret}
+${killerExtra}
+
+[절대 규칙]
+1. 이 파티와 한재원 독살 사건 외의 내용은 절대 언급 금지.
+2. 게임임을 절대 언급 금지.
+3. 2~4문장 이내. 한국어만.`;
+}
+
+async function presentClue(clue){
+  if(!G.sel||G.presentCount[G.sel]<=0||G.loading) return;
+  const sid=G.sel; G.presentCount[sid]--;
+  document.getElementById('presentWrap').style.display='none';
+  const s=SP.find(x=>x.id===sid); const isK=G.killer===sid;
+  addToLog(sid,'present',`${clue.name} — ${clue.desc}`);
+  G.loading=true; const tel=addSysMsg('반응 확인 중...'); tel.className='typing';
+  updateInfoPanel(sid);
+  const sys=buildSysPrompt(s,isK)+`\n\n[현재 상황] 수사관이 방금 당신 앞 테이블에 "${clue.name}" 증거물을 꺼내 놓았습니다 (${clue.desc}). 당신은 그것을 눈으로 직접 보고 있습니다. 텍스트가 아니라 실물을 눈앞에서 보는 것처럼, 순간적인 표정 변화와 감정 반응을 포함해 답하세요.`;
+  try {
+    const ans=await callAPI(sys,[{role:'user',content:`(수사관이 "${clue.name}"을 테이블에 내려놓으며 말없이 바라본다)`}]);
+    tel.remove(); addToLog(sid,'npc',ans); checkNext();
+  } catch(e){ tel.remove(); addSysMsg('오류: '+e.message); }
+  G.loading=false; renderGrid();
+}
+
+async function callAPI(system,messages){
+  const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system,messages})});
+  const data=await res.json();
+  if(data.error) throw new Error(data.error);
+  return data.text;
+}
+
+async function ask(){
+  if(G.loading) return;
+  if(!G.sel){ addSysMsg('먼저 용의자를 선택하세요.'); return; }
+  const inp=document.getElementById('qinput'); const q=inp.value.trim(); if(!q) return;
+  const s=SP.find(x=>x.id===G.sel); const rem=MQ[G.round]-G.qc[s.id];
+  if(rem<=0){ addSysMsg(`${s.name}에게 이 라운드에서 더 이상 질문할 수 없습니다.`); return; }
+  inp.value=''; G.loading=true; G.qc[s.id]++;
+  addToLog(s.id,'usr',q); const tel=addSysMsg('응답 중...'); tel.className='typing'; renderGrid();
+  const isK=G.killer===s.id; const sys=buildSysPrompt(s,isK);
+  const msgs=[];
+  G.chatLogs[s.id].filter(m=>m.type==='usr'||m.type==='npc').forEach(m=>msgs.push({role:m.type==='usr'?'user':'assistant',content:m.text}));
+  if(msgs.length&&msgs[msgs.length-1].role==='user') msgs.pop();
+  msgs.push({role:'user',content:q});
+  try {
+    const ans=await callAPI(sys,msgs); tel.remove(); addToLog(s.id,'npc',ans);
+    if(!G.clues.find(c=>c.code===s.clue.code)&&G.qc[s.id]>=2){ G.clues.push(s.clue); addToLog(s.id,'clue',s.clue.desc); updateClueLabel(); }
+    checkNext();
+  } catch(e){ tel.remove(); addSysMsg('오류: '+e.message); }
+  G.loading=false; renderGrid();
+}
+
+function checkNext(){
+  // 다음 단계/투표는 항상 보이므로 별도 체크 불필요
+}
+
+async function goStmt(){
+  showScr('statements-screen'); setProg(4); setPhase('최후 진술');
+  const grid=document.getElementById('stmts');
+  grid.innerHTML='<div class="msg-sys" style="padding:12px">최후 진술 생성 중...</div>';
+  const results=[];
+  for(const s of SP){
+    const isK=s.id===G.killer;
+    const sys=`당신은 ${s.name}(${s.role})입니다. 오늘 밤 강남 레드라인 펜트하우스 파티에서 CEO 한재원이 독살됐습니다. 지금 수사관 앞에서 최후 진술을 합니다. 성격: ${s.personality}\n${isK?'범인이지만 절대 티내지 않고 무고한 척 진술하세요.':'무고합니다. 솔직하게 오늘 밤 소감을 말하세요.'}\n절대 규칙: 이 사건 외 다른 소재 언급 금지. 게임 언급 금지. 2~3문장. 한국어만.`;
+    try { const text=await callAPI(sys,[{role:'user',content:'최후 진술을 해주세요.'}]); results.push({s,text}); }
+    catch(e){ results.push({s,text:s.stmt}); }
+  }
+  grid.innerHTML='';
+  results.forEach(({s,text})=>{
+    const c=document.createElement('div'); c.className='stcard';
+    c.innerHTML=`<img src="${s.img}" /><div class="stbody"><div class="stname">${s.name} · ${s.role}</div>${text}</div>`;
+    grid.appendChild(c);
+  });
+}
+
+function goVote(){
+  showScr('vote-screen'); setPhase('최종 투표');
+  const grid=document.getElementById('vgrid'); grid.innerHTML='';
+  SP.forEach(s=>{
+    const c=document.createElement('div'); c.className='vcard'; c.id='v'+s.id;
+    c.onclick=()=>selVote(s.id);
+    c.innerHTML=`<img src="${s.img}" /><div class="vname">${s.name}</div><div class="vrole">${s.role}</div>`;
+    grid.appendChild(c);
+  });
+}
+
+// 최후 진술 먼저 or 바로 투표
+async function goVoteOrStmt(){
+  // 최후 진술 없이 바로 투표 가능하도록
+  goVote();
+}
+
+function selVote(id){
+  G.vote=id;
+  document.querySelectorAll('.vcard').forEach(c=>c.classList.remove('sel'));
+  document.getElementById('v'+id).classList.add('sel');
+  const s=SP.find(x=>x.id===id);
+  document.getElementById('vtext').textContent=`"${s.name}"을(를) 범인으로 지목합니다. 확신하십니까?`;
+  document.getElementById('vconfirm').style.display='block';
+}
+function cancelVote(){ G.vote=null; document.querySelectorAll('.vcard').forEach(c=>c.classList.remove('sel')); document.getElementById('vconfirm').style.display='none'; }
+
+function submitVote(){
+  const ok=G.vote===G.killer;
+  const killer=SP.find(x=>x.id===G.killer);
+  const chosen=SP.find(x=>x.id===G.vote);
+  const sc=killer.scenario;
+  showScr('result-screen'); setPhase('수사 종결');
+
+  document.getElementById('rverdict').textContent=ok?'🔴 정답':'⬜ 오답';
+  document.getElementById('rkillerImg').src=killer.img;
+  document.getElementById('rkillerName').textContent=`범인: ${killer.name}`;
+  document.getElementById('rkillerRole').textContent=killer.role;
+
+  let body='';
+  body+=`<div class="result-section"><div class="result-section-title">MOTIVE — 범행 동기</div><div class="result-section-text">${sc.motive}</div></div>`;
+  body+=`<div class="result-section"><div class="result-section-title">METHOD — 범행 방법</div><div class="result-section-text">${sc.method}</div></div>`;
+  body+=`<div class="result-section"><div class="result-section-title">EVIDENCE — 결정적 증거</div><div class="result-section-text">${sc.evidence.map(e=>`<div style="padding:3px 0">• ${e}</div>`).join('')}</div></div>`;
+  body+=`<div class="result-section"><div class="result-section-title">LIES — ${killer.name}의 거짓말</div><div class="result-section-text">${sc.lies.map(l=>`<div class="result-lie">${l}</div>`).join('')}</div></div>`;
+  body+=`<div class="result-section"><div class="result-section-title">MISSED — 당신이 놓친 단서</div><div class="result-section-text">${sc.missed.map(m=>`<div class="result-missed">${m}</div>`).join('')}</div></div>`;
+  document.getElementById('resultBody').innerHTML=body;
+  document.getElementById('resultWrongNote').textContent=ok?'':'당신이 지목한 '+chosen.name+'은(는) 무고합니다.';
+}
+</script>
+</body>
+</html>
