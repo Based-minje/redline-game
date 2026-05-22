@@ -114,8 +114,8 @@ body { background: #06060d; font-family: Georgia, serif; min-height: 100vh; disp
 .info-role { font-size: 11px; color: #666; text-align: center; margin-bottom: 12px; }
 .info-divider { border: none; border-top: 1px solid #1e1e2e; margin: 10px 0; }
 .info-label { font-size: 10px; color: #555; letter-spacing: 1px; margin-bottom: 5px; }
-.info-text { font-size: 11px; color: #aaa; line-height: 1.7; margin-bottom: 10px; }
-.info-alibi { background: #0d0d08; border: 1px solid #2a2a10; border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #9a8; line-height: 1.6; }
+.info-text { font-size: 11px; color: #ccc; line-height: 1.7; margin-bottom: 10px; }
+.info-alibi { background: #0d0d08; border: 1px solid #2a2a10; border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #aab899; line-height: 1.6; }
 .info-alibi-label { font-size: 10px; color: #565; margin-bottom: 4px; }
 .present-remain { margin-top: 10px; background: #0d0810; border: 1px solid #2a1a2a; border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #a88; }
 .present-remain-label { font-size: 10px; color: #664; margin-bottom: 4px; }
@@ -125,20 +125,20 @@ body { background: #06060d; font-family: Georgia, serif; min-height: 100vh; disp
 .chat-tab { background: #0d0d16; border: 1px solid #1e1e2e; border-bottom: none; border-radius: 4px 4px 0 0; padding: 5px 10px; font-size: 10px; color: #555; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
 .chat-tab:hover { color: #888; }
 .chat-tab.active { background: #080810; color: #c88; border-color: #2a1a1a; }
-.chat-box { background: #080810; border: 1px solid #1e1e2e; border-radius: 0 4px 8px 8px; height: 210px; overflow-y: auto; padding: 12px; font-size: 12px; line-height: 1.75; }
+.chat-box { background: #080810; border: 1px solid #1e1e2e; border-radius: 0 4px 8px 8px; height: 210px; overflow-y: auto; padding: 12px; font-size: 12px; line-height: 1.75; scroll-behavior: smooth; }
 @media (max-width: 600px) {
   .chat-box { height: 180px; font-size: 11.5px; }
 }
 .chat-box::-webkit-scrollbar { width: 4px; }
 .chat-box::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-.msg-sys { color: #404040; font-style: italic; margin-bottom: 6px; }
-.msg-usr { color: #7a9a7a; margin-bottom: 8px; }
-.msg-usr .lbl { font-size: 10px; color: #5a7a5a; display: block; margin-bottom: 2px; }
-.msg-npc { color: #c4a88a; margin-bottom: 10px; }
-.msg-npc .lbl { font-size: 10px; color: #906848; display: block; margin-bottom: 2px; }
-.msg-clue-log { color: #a89a6a; background: #141408; border-left: 2px solid #5a5020; padding: 5px 10px; margin-bottom: 8px; border-radius: 0 4px 4px 0; font-size: 11px; }
-.msg-present { color: #b8a860; background: #161208; border-left: 2px solid #7a6020; padding: 6px 10px; margin-bottom: 8px; border-radius: 0 4px 4px 0; font-size: 11px; font-style: italic; }
-.typing { color: #444; font-style: italic; }
+.msg-sys { color: #666666; font-style: italic; margin-bottom: 6px; }
+.msg-usr { color: #90bb90; margin-bottom: 8px; }
+.msg-usr .lbl { font-size: 10px; color: #70a070; display: block; margin-bottom: 2px; }
+.msg-npc { color: #ddc4a0; margin-bottom: 10px; }
+.msg-npc .lbl { font-size: 10px; color: #b08860; display: block; margin-bottom: 2px; }
+.msg-clue-log { color: #ccbb80; background: #141408; border-left: 2px solid #5a5020; padding: 5px 10px; margin-bottom: 8px; border-radius: 0 4px 4px 0; font-size: 11px; }
+.msg-present { color: #d4c070; background: #161208; border-left: 2px solid #7a6020; padding: 6px 10px; margin-bottom: 8px; border-radius: 0 4px 4px 0; font-size: 11px; font-style: italic; }
+.typing { color: #888; font-style: italic; }
 .irow { display: flex; gap: 8px; margin-top: 8px; }
 .irow input { flex: 1; background: #10101a; border: 1px solid #252535; border-radius: 6px; padding: 9px 14px; color: #e8e0d0; font-size: 13px; font-family: Georgia, serif; outline: none; }
 @media (max-width: 600px) {
@@ -588,6 +588,12 @@ function showAllChat(){
   box.scrollTop=box.scrollHeight;
 }
 
+function isUserScrolledUp(box){
+  return box.scrollHeight - box.scrollTop - box.clientHeight > 60;
+}
+function smartScroll(box){
+  if(!isUserScrolledUp(box)) box.scrollTop=box.scrollHeight;
+}
 function showChat(id){
   const box=document.getElementById('chatBox'); box.innerHTML='';
   const logs=G.chatLogs[id]; const s=SP.find(x=>x.id===id);
@@ -602,8 +608,22 @@ function showChat(id){
   box.scrollTop=box.scrollHeight;
 }
 
-function addToLog(id,type,text){ G.chatLogs[id].push({type,text}); if(G.sel===id)showChat(id); }
-function addSysMsg(text){ const box=document.getElementById('chatBox'); const d=document.createElement('div'); d.className='msg-sys'; d.textContent=text; box.appendChild(d); box.scrollTop=box.scrollHeight; return d; }
+function addToLog(id,type,text){
+  G.chatLogs[id].push({type,text});
+  if(G.sel===id){
+    const box=document.getElementById('chatBox');
+    const wasAtBottom=!isUserScrolledUp(box);
+    showChat(id);
+    if(wasAtBottom) box.scrollTop=box.scrollHeight;
+  }
+}
+function addSysMsg(text){
+  const box=document.getElementById('chatBox');
+  const d=document.createElement('div'); d.className='msg-sys'; d.textContent=text;
+  box.appendChild(d);
+  smartScroll(box);
+  return d;
+}
 
 // 팝업
 let popupCallback=null;
@@ -737,18 +757,39 @@ async function ask(){
   const inp=document.getElementById('qinput'); const q=inp.value.trim(); if(!q) return;
   const s=SP.find(x=>x.id===G.sel); const rem=MQ[G.round]-G.qc[s.id];
   if(rem<=0){ addSysMsg(`${s.name}에게 이 라운드에서 더 이상 질문할 수 없습니다.`); return; }
-  inp.value=''; G.loading=true; G.qc[s.id]++;
-  addToLog(s.id,'usr',q); const tel=addSysMsg('응답 중...'); tel.className='typing'; renderGrid();
+
+  // 관련없는 질문 사전 필터 (차감 없음)
+  const irrelevantKeywords = ['날씨','오늘 뭐','점심','저녁','안녕','반가워','취미','좋아하는','주말','여행','영화','드라마'];
+  const isIrrelevant = irrelevantKeywords.some(k => q.includes(k));
+  if(isIrrelevant){
+    addToLog(s.id,'usr',q);
+    addToLog(s.id,'npc','오늘 밤 사건에 대한 질문만 답변드릴 수 있습니다. 한재원 대표님의 사건과 관련된 질문을 해주십시오.');
+    return;
+  }
+
+  inp.value=''; G.loading=true;
+  // 먼저 UI에만 추가, 카운트는 성공 후 올림
+  addToLog(s.id,'usr',q);
+  const tel=addSysMsg('응답 중...'); tel.className='typing'; renderGrid();
   const isK=G.killer===s.id; const sys=buildSysPrompt(s,isK);
   const msgs=[];
   G.chatLogs[s.id].filter(m=>m.type==='usr'||m.type==='npc').forEach(m=>msgs.push({role:m.type==='usr'?'user':'assistant',content:m.text}));
   if(msgs.length&&msgs[msgs.length-1].role==='user') msgs.pop();
   msgs.push({role:'user',content:q});
   try {
-    const ans=await callAPI(sys,msgs); tel.remove(); addToLog(s.id,'npc',ans);
+    const ans=await callAPI(sys,msgs);
+    tel.remove();
+    // 성공했을 때만 카운트 차감
+    G.qc[s.id]++;
+    addToLog(s.id,'npc',ans);
     if(!G.clues.find(c=>c.code===s.clue.code)&&G.qc[s.id]>=2){ G.clues.push(s.clue); addToLog(s.id,'clue',s.clue.desc); updateClueLabel(); }
     checkNext();
-  } catch(e){ tel.remove(); addSysMsg('오류: '+e.message); }
+  } catch(e){
+    tel.remove();
+    // 실패시 카운트 롤백, 로그에서 마지막 user 메시지 제거
+    G.chatLogs[s.id].pop();
+    addSysMsg('⚠ 응답 오류가 발생했습니다. 질문 횟수는 차감되지 않았습니다. 다시 시도해주세요.');
+  }
   G.loading=false; renderGrid();
 }
 
